@@ -63,10 +63,12 @@ class DisplayObject
 
   setImage:(url)->
     @url=url
-    console.log @world
     @image= @world.p.requestImage(@url)
 
   draw:->
+
+  enterFrame:->
+
 
 
 
@@ -74,40 +76,68 @@ class DisplayObject
 class Character extends DisplayObject
   constructor:(x,y,width,height)->
     super(x,y,width,height)
-    @frame=null
-    @framePosition=1
+    @base=y
+    @frame=[]
+
+    @_framePosition=1
 
 
 
   setFrame:(w,h)->
     @frameSize={"w":w,"h":h}
 
-  setFramePosition:(position)->
-    @framePosition=position
+
+
+  setFramePosition:(position,yPosition,count,speed)->
+    @_framePosition=position
+    @_yPosition=yPosition
+    @_frameCount=count
+    @_speed=speed
+
+  framePosition:->
+    Math.floor(@_framePosition)%@_frameCount
 
   getFrameOverShoot:->
-    x=@frameSize.w*@framePosition
+    x=@frameSize.w*@framePosition()
     x
 
   getFrameX:()->
-    x=@getFrameOverShoot()
-    if x > @image.width
-      x%=@image.width
-    x
+    @frameSize.w*@framePosition()
+
+  getFrameWidth:->
+    @getFrameX()+@frameSize.w
+
 
   getFrameY:()->
-    x=parseInt(@getFrameOverShoot()/@image.width)
-    x+=@frameSize.h
+    @_yPosition*@frameSize.h
 
+  getFrameHeight:()->
+    @frameSize.h
+
+  X:->
+    @x
+
+  Y:->
+    @y
+
+  getFrame:(x,y)->
+    if typeof @frame[x] is "undefined" or @frame[x] is null
+      @frame[x]=[]
+    if typeof @frame[x][y] is "undefined" or @frame[x][y] is null
+      @frame[x][y]=@world.p.createImage(@width,@height)
+      @frame[x][y].copy(@image,@getFrameX(),@getFrameY(),@frameSize.w,@frameSize.h,0,0,@width,@height)
+
+
+
+
+    @frame[x][y]
 
   draw:()->
+
     if @image isnt null
       if @image.width isnt 0
         if typeof @frameSize isnt "undefined"
-
-          document.getElementById("info").innerHTML="#{@x},#{@y}, #{@getFrameX()},#{@getFrameY()}"
-
-          @frame=@world.p.copy(@image,0,0,@getFrameX(),@getFrameY(),@x,@y,@getFrameX(),@getFrameY())
+          @world.p.image(@getFrame(@_framePosition,@_yPosition),@X(),@Y())
         else
          @world.p.image(@image,@x,@y)
 
@@ -122,35 +152,66 @@ class Character extends DisplayObject
 
 
 
+
 class PlayerController
-  constructor:(player)->
-
+  constructor: (player)->
     @init.call player
-    @keypress=[]
-    @interval=[]
+    @keypress = []
+    @interval = []
 
 
-  init:->
-    @right= new ButtonEvent(@,39)
-    @right.down= =>
-      @x+=5
+  init: ->
+    @right = new ButtonEvent(@, 39)
 
-    @left= new ButtonEvent(@,37)
-    @left.down= =>
-      @x-=5
+    @right.down = =>
+      @velocity= Math.round(World.timeLapse() * 0.5)
+      @x += @velocity
+      @flip=off
 
-    @jump= new ButtonEvent(@,32)
-    @jump.keypress=(key)=>
-      @gravity+=@base_gravity
-      @y+=@yV
-      @y+=@gravity
-      @y=Math.round(@y)
+      if @base is @y
+        @_framePosition += @_speed * World.timeLapse()
 
-      if @y>@baseY
+      if @_yPosition is 1 and @base is @y
+        @setFramePosition(0, 0, 7, 0.015)
+
+      @x = Math.min(100, @x)
+
+    @right.up = =>
+      @setFramePosition(0, 1, 5, 0.000)
+      @velocity=0
+
+
+    @left = new ButtonEvent(@, 37)
+    @left.down = =>
+      @flip=on
+      @velocity= - Math.round(World.timeLapse() * 0.5)
+      @x +=@velocity
+      @x = Math.max(1, @x)
+
+    @left.up = =>
+      @setFramePosition(0, 1, 5, 0.000)
+      @velocity=0
+
+
+    @jump = new ButtonEvent(@, 32)
+    @jump.keypress = (key)=>
+      if @y is @base
+        @setFramePosition(1, 1, 5, 0.007)
+      else
+        @_framePosition += @_speed * World.timeLapse()
+
+
+      @gravity += @base_gravity * World.timeLapse()
+      @y += @yV * World.timeLapse()
+      @y += @gravity
+      @y = Math.round(@y)
+
+      if @y > @baseY
         window.clearInterval(key)
         eval('this').clear();
-        @y=@baseY
-        @gravity=0
+        @y = @baseY
+        @gravity = 0
+        p.setFramePosition(1, 0, 7, 0.015)
 
 
 
@@ -178,61 +239,168 @@ class Enemy extends Character
 
 
 
+
+
 class Player extends Enemy
   constructor:(x,y,w,h)->
     super(x,y,w,h)
     @control=new PlayerController(@)
-    @yV=-10
+    @yV=-1.3
     @baseY=y
-    @base_gravity=0.5
+    @base_gravity=0.1
     @gravity=0
+    @flip=off
+    @velocity=0
 
 
 
 
 class World
-   constructor:(canvas)->
-     console.log "created the world"
+  constructor: (canvas,width=600,height=400)->
+    console.log "created the world"
+    @framerateContainer=document.getElementById("framerate")
+    @child = []
+    @p = new Processing canvas
+    console.log "created the canvas"
 
-     @child=[]
-     @p=new Processing canvas
-     console.log "created the canvas"
+    @p.size(width, height)
+    console.log "created the background"
+    @init()
+    console.log "created the game loop"
 
-     @p.size(600,300)
-     @p.background(100)
-     console.log "created the background"
-     @init()
-     console.log "created the game loop"
+  @timeLapse: ->
+    f = World.enterFrame
+    f[f.length - 1] - f[f.length - 2] || 0
 
+  @enterFrame: []
 
-   addChild:(dp)->
-     @child.push(dp)
+  addPlayer:(@player)->
 
-   init:->
-     @loop()
-     window.requestAnimationFrame(=>
+  addChild: (dp)->
+    @child.push(dp)
+
+  init: ->
+    World.enterFrame.push(Date.now())
+    if World.enterFrame.length > 20
+      World.enterFrame.shift()
+
+      @loop()
+    window.requestAnimationFrame(=>
       @init()
-     )
+    )
 
 
-   loop:->
-    @p.background(255)
+  loop: ->
+    @p.background(135,206,250)
     for c in @child
+      c.enterFrame()
       c.draw(@p)
+
+    @player.draw(@p)
+
 
 
 
 canvas= document.getElementById("canvas")
 
-world = new World(canvas)
+world = new World(canvas,document.body.clientWidth,document.body.clientHeight)
 
-p = new Player(10,50,200,200)
+window.addEventListener("resize",->
+  world.p.size(document.body.clientWidth,document.body.clientHeight)
+,false)
+
+
+base= document.body.clientHeight-150
+
+
+
+
+###
+  The Grass
+###
+for i in [0..Math.ceil(document.body.clientWidth/50)]
+  e = new Character(i*200,base+80,300,300)
+  e.setWorld(world)
+  e.speed=0
+  e.setFrame(150,150)
+  e.setFramePosition(0,0,5,0)
+  e.enterFrame= ->
+    if @x <= -1000
+      @x=document.body.clientWidth+500
+    @x -=(@world.player.velocity || 0)
+
+  #world adding the enemy
+  e.setImage("../resources/grass.png")
+  world.addChild(e)
+
+
+###
+  The Clouds
+###
+for i in [0..5]
+  e = new Character(Math.random()*document.body.clientWidth,-350+(document.body.clientHeight/2)*Math.random(),500,500)
+  e.setWorld(world)
+  e.speed=Math.random()**3
+  e.setFrame(270,270)
+  e.setFramePosition(Math.round(Math.random()*4),0,4,0)
+  e.enterFrame= ->
+    if @x <= -500
+      @x=document.body.clientWidth+Math.random()*400
+    @x -=@speed+(@world.player.velocity || 0)
+
+  #world adding the enemy
+  e.setImage("../resources/clouds.png")
+  world.addChild(e)
+
+
+
+
+###
+  The House
+###
+for i in [0..10]
+  e = new Character(i*Math.random()*500*i,base-160,350,249)
+  e.setWorld(world)
+  e.speed=0
+  e.setFrame(350,249)
+  e.setFramePosition(0,0,5,0)
+  e.enterFrame= ->
+    if @x <= -5000
+      @x=document.body.clientWidth+Math.random()*900
+    @x -=(@world.player.velocity || 0)
+
+  #world adding the enemy
+  e.setImage("../resources/house.png")
+  world.addChild(e)
+
+
+
+
+
+for i in [0..2]
+  e = new Enemy(Math.random()*5000+400,base+40,100,100)
+  e.setWorld(world)
+  e.speed=2
+  e.setFrame(45,45)
+  e.setFramePosition(0,0,5,0)
+  e.enterFrame= ->
+    if @x <-200
+      @speed= Math.random()*5
+      @x=document.body.clientWidth+500
+    @x -=@speed+(@world.player.velocity || 0)
+
+  #world adding the enemy
+  e.setImage("../resources/monster-sprite.png")
+  world.addChild(e)
+
+
+
+p = new Player(10,base,90,135)
 p.setWorld(world)
-p.setFrame(70.2,120)
-p.setFramePosition(3)
-
+p.setFrame(90,135)
+p.setFramePosition(0,1,7,0.000)
 
 #world adding the player
-world.addChild(p)
-p.setImage("../resources/07gh_sim_tillerman_zpsa2af4431.jpg")
+world.addPlayer(p)
+p.setImage("../resources/07gh_sim_tillerman_zpsa2af4431.png")
 

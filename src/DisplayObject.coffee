@@ -6,8 +6,10 @@ class DisplayObject
 
   setImage:(url)->
     @url=url
-    console.log @world
     @image= @world.p.requestImage(@url)
 
   draw:->
+
+  enterFrame:->
+
 
