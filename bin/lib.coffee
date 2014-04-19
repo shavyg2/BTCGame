@@ -202,7 +202,7 @@ class PlayerController
 
 
       @gravity += @base_gravity * World.timeLapse()
-      @y += @yV * World.timeLapse()
+      @y += @yV
       @y += @gravity
       @y = Math.round(@y)
 
@@ -245,7 +245,7 @@ class Player extends Enemy
   constructor:(x,y,w,h)->
     super(x,y,w,h)
     @control=new PlayerController(@)
-    @yV=-1.3
+    @yV=-40
     @baseY=y
     @base_gravity=0.1
     @gravity=0

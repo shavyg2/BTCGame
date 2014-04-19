@@ -49,7 +49,7 @@ class PlayerController
 
 
       @gravity += @base_gravity * World.timeLapse()
-      @y += @yV * World.timeLapse()
+      @y += @yV
       @y += @gravity
       @y = Math.round(@y)
 

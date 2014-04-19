@@ -236,7 +236,7 @@
             _this._framePosition += _this._speed * World.timeLapse();
           }
           _this.gravity += _this.base_gravity * World.timeLapse();
-          _this.y += _this.yV * World.timeLapse();
+          _this.y += _this.yV;
           _this.y += _this.gravity;
           _this.y = Math.round(_this.y);
           if (_this.y > _this.baseY) {
@@ -271,7 +271,7 @@
     function Player(x, y, w, h) {
       Player.__super__.constructor.call(this, x, y, w, h);
       this.control = new PlayerController(this);
-      this.yV = -1.3;
+      this.yV = -40;
       this.baseY = y;
       this.base_gravity = 0.1;
       this.gravity = 0;
